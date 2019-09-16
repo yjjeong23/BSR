@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BSR 소음 분류기</title>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link href="{{ url_for('static',filename='css/basic.css') }}" rel="stylesheet">
+    <link href="http://fonts.googleapis.com/earlyaccess/nanumgothiccoding.css" rel="stylesheet">
+    <script src="//code.jquery.com/jquery-1.9.1.min.js"></script>
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static',filename='js/Chart.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='js/gauge.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='js/RangeSlider-all.min.js') }}"></script>
+</head>
+<body>
+    <div class="header">
+        <h5>BSR 소음 탐색</h5>
+
+        <label class="file-label" style="margin-bottom:0; "> 파일 선택
+                        <input type="file" accept="audio/*,video/*" id="file" onchange="playlocalVID();" style="display:none"/>
+                    </label>
+
+        <img class="logo" src="{{ url_for('static',filename='icons/logo-Full.png') }}" width = "270px" style="position: relative; top: -3px;float:right;margin-right: 10px"/>
+      <!--  <img class="logo" src="{{ url_for('static',filename='icons/Yonsei-Full.png') }}" width = "100px" style="float:right;margin-right: 10px"/> -->
+
+    </div>
+    <div class="wrapper">
+
+
+        <div id="player">
+            <video id="video-element" ><source id="currentVID" src=""></video>
+
+            <div id='controls'>
+                <div class="buttons" style="float:left; margin-left: 10px">
+                    <button id='btnPlayPause' class='play' title='play' accesskey="P" onclick='playPauseVideo();'><i class="fa fa-play"></i></button>
+                    <button id='btnStop' class='stop' title='stop' accesskey="X" onclick='stopVideo();'><i class="fa fa-stop"></i></button>
+                    <button id='btnReplay' class='replay' title='replay' accesskey="R" onclick='replayVideo();'><i class="fa fa-repeat"></i></button>
+                    <button id='btnMute' class='volume-up' title='mute' onclick='muteVolume();'><i class="fa fa-volume-up"></i></button>
+                 </div>
+                 <input type="range" id="volume-bar" title="volume" min="0" max="1" step="0.1" value="1">
+               <div id="time">
+                    <p class="current">00:00</p><p>/</p><p class="duration">00:00</p>
+               </div>
+
+
+                <progress id='progress-bar' min='0' max='100' value='0' style="float: left; width: -webkit-calc(100% - 275px)">0% played</progress>
+
+                <div style="clear:both;"></div>
+             </div>
+
+        </div>
+
+
+<div class="bar" >
+    <div class="title">소음 지속시간<span style="font-size: 80%" (단위:초)</span></div>
+
+        <div class="gauge">
+          <canvas id="foo" style="width:100%"></canvas>
+
+        </div>
+    <table id="normalRatio" style="position:relative; top: -48px; width:60%; font-size: 17px; margin: 0 auto; text-align: center;">
+        <tr>
+             <td colspan="2"><div id="gauge-value-risk" style="font-size: 25px; font-weight: bold; text-align: center ; padding-bottom: 2px; color:#30B32D">안전</div></td>
+        </tr>
+          <tr>
+
+            <td >지속시간</td>
+            <td><span id="gauge-value" style="font-size: 18px;font-weight: bold;">00:00 </span></td>
+          </tr>
+          <tr>
+            <td >경과시간</td>
+            <td><span class="current">00:00</span> </td>
+          </tr>
+    </table>
+</div>
+
+<div class="bar">
+    <div class="title">분류별 소음 지속시간<span style="font-size: 80%">(단위:초)</span></div>
+              <div class="polar">
+                <canvas id="polar"></canvas>
+              </div>
+</div>
+
+
+
+        <div id="result">
+            <div class="title">동작 진행</div>
+            <div id="film"></div>
+             <div id="frame" ></div>
+              <div id="chart">
+                  <canvas id="ini" style="width: 110%; height: 100px;  margin-top: 15px;" ></canvas>
+              </div>
+
+
+                    <table id ="legends">
+                      <tr>
+                          {% for i in range(5) %}
+                        <td>
+                            <svg height="10" width="25">
+                                 <circle cx="12" cy="5" r="5" fill="{{ colors[i] }}" />
+                            </svg>
+                        </td>
+                        <td><div style="height:20px; overflow:hidden">{{ legends[i] }}</div></td>
+                          {% endfor %}
+                      </tr>
+                      <tr>
+                          {% for i in range(5,10) %}
+                        <td>
+                            <svg height="10" width="25">
+                                 <circle cx="12" cy="5" r="5" fill="{{ colors[i] }}" />
+                            </svg>
+                        </td>
+                        <td><div style="height:20px; overflow:hidden">{{ legends[i] }}</div></td>
+                          {% endfor %}
+                      </tr>
+                </table>
+
+                <div id="framebox" ></div>
+         </div>
+
+        <div class="pie">
+                <div class="title">현 분류 상황 </div>
+                    <img class="btn-img" src="/static/icons/blueprint-1.png" width="70%" style="margin-left: 16%;">
+
+                    <span class="classes"  style="top: -425px; ">가진기 소음</span><br>
+                        <div id="pg-bar" style="top: -425px;  ">
+                            <span id="pg0" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+
+                    <span class="classes" style="top: -345px; left: 425px; ">센터콘솔 암레스트 래틀</span><br>
+                    {% for i in [1,2,3] %}
+                    <span class = "subclasses" style="top: -345px; left: 425px; ">{{i}}</span>
+                        <div id="pg-bar" style="top: -345px; left: 425px;">
+                            <span id="pg{{i}}" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+                    {%endfor%}
+
+                    <span class="classes" style="top: -315px; left: 425px; ">시트레일 래틀</span><br>
+                    {% for i in [4,5] %}
+                    <span class = "subclasses" style="top: -315px; left: 425px; ">{{i - 3}}</span>
+                        <div id="pg-bar" style="top: -315px; left: 425px;">
+                            <span id="pg{{i}}" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+                    {%endfor%}
+
+
+                    <span class="classes" style="top: -570px;">{{legends[8]}}</span><br>
+                        <div id="pg-bar" style="top: -570px;">
+                            <span id="pg8" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+                    <span class="classes" style="top: -565px;">{{legends[7]}}</span><br>
+                        <div id="pg-bar" style="top: -565px;">
+                            <span id="pg7" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+                    <span class="classes" style="top: -560px;">{{legends[6]}}</span><br>
+                        <div id="pg-bar" style="top: -560px;">
+                            <span id="pg6" class="progress-value">0.00%</span>
+                        </div>
+                    <br>
+                        <span class="classes" style="top: -545px;">{{legends[9]}}</span><br>
+                    <div id="pg-bar" style="top: -545px;">
+                            <span id="pg9" class="progress-value">0.00%</span>
+                        </div>
+                        <br>
+
+
+
+        </div>
+
+    </div>
+
+<script>
+var row_valuelist = {{ row_valuelist }};
+var player = document.getElementById("video-element");
+var btnPlayPause = document.getElementById('btnPlayPause');
+var btnMute      = document.getElementById('btnMute');
+var progressBar  = document.getElementById('progress-bar');
+var volumeBar    = document.getElementById('volume-bar');
+var cur = document.getElementsByClassName("current");
+var cur_index;
+var seeking = false;
+
+function getTImeFormat(value){
+      var sec = Math.floor(value);
+      var milisec = ((value - sec)*100).toFixed(0);
+      if (sec < 10 ) sec = "0"+sec;
+      if (milisec < 10) milisec = "0" + milisec;
+
+      return sec +":"+ milisec
+}
+
+
+var opts = {
+    angle: 0, // The span of the gauge arc
+  lineWidth: 0.38, // The line thickness
+  radiusScale: 0.79, // Relative radius
+    fontSize: 40,
+  pointer: {
+    length: 0.24, // // Relative to gauge radius
+    strokeWidth: 0.04, // The thickness
+    color: '#000000' // Fill color
+  },
+  limitMax: false,     // If false, max value increases automatically if value > maxValue
+  limitMin: false,     // If true, the min value of the gauge will be fixed
+  //colorStart: '#6FADCF',   // Colors
+  //colorStop: '#8FC0DA',    // just experiment with them
+  //strokeColor: '#E0E0E0',  // to see which ones work best for you
+  generateGradient: true,
+  highDpiSupport: true,     // High resolution support
+  staticZones: [
+   {strokeStyle: "#F03E3E", min: 0, max: 45}, // Green
+   {strokeStyle: "#f78002", min: 45, max: 80}, // Yellow
+   {strokeStyle: "#30B32D", min: 80, max: 100}  // Red
+],
+  {#staticLabels: {#}
+  {#    font: "10px sans-serif",  // Specifies font#}
+  {#    labels: [20,40,60],  // Print labels at these values#}
+  {#    color: "#000000",  // Optional: Label text color#}
+  {#    fractionDigits: 0  // Optional: Numerical precision. 0=round off.#}
+  {#  },#}
+
+};
+var target = document.getElementById('foo'); // your canvas element
+var gauge = new Gauge(target).setOptions(opts); // create sexy gauge!
+gauge.maxValue = 100; // set max gauge value
+gauge.setMinValue(0);  // Prefer setter over gauge.minValue = 0
+gauge.animationSpeed = 1; // set animation speed (32 is default value)
+gauge.set(100); // set actual value
+
+//var textRenderer = new TextRenderer(document.getElementById('gauge-value'));
+var risk = document.getElementById("gauge-value-risk");
+var textRenderer = new TextRenderer(document.getElementById('gauge-value'))
+textRenderer.render = function(gauge){
+        if (updateCall ==0) {gauge.set(100); this.el.innerHTML = "00:00";this.el.style.color = "#000000";risk.innerHTML = "안전"; risk.style.color ="#30B32D";}
+        else {
+           if (cur_index <= {{ value_list[0]|count }})this.el.innerHTML = getTImeFormat((player.currentTime - (row_valuelist[cur_index][0])).toFixed(2));
+
+           if (gauge.displayedValue > 80) { risk.innerHTML = "안전"; risk.style.color ="#30B32D"; this.el.style.color = "#30B32D";}
+           else if (gauge.displayedValue > 45)  {risk.innerHTML = "주의"; risk.style.color ="#f78002"; this.el.style.color = "#f78002";}
+           else {risk.innerHTML="위험";risk.style.color ="#F03E3E";  this.el.style.color = "#F03E3E";};
+        }
+    };
+
+gauge.setTextField(textRenderer);
+//gauge.setTextField(textRenderer2);
+
+function updateGauge(cur_index){
+    var value =   row_valuelist[cur_index][0] / (cur_index/50);
+    gauge.animationSpeed = 10;
+    gauge.set(value*100);
+    gauge.setTextField(textRenderer);
+    //  gauge.setTextField(document.getElementById('gauge-value'));
+}
+
+
+// line chart data
+ var iniData = {
+    labels:{{ range( value_list[0]|count)|list }},
+    datasets:[
+        {% for i in range(legends|count) %}
+        {
+        label: "{{ legends[i] }}",
+        backgroundColor:"rgba(172,194,132,0)",
+        borderColor:"{{ colors[i] }}",
+        data:{{ value_list[i] }},
+           pointRadius: 0,
+    },
+        {% endfor %}
+
+    ]
+},
+
+
+// create the options
+options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scaleBeginAtZero: true,
+    animation:{
+        duration : 1000,
+        easing : 'linear'
+    },
+    scales: {
+        xAxes: [{
+            ticks:{
+                callback: function (value){
+                  return getTImeFormat(value/50);
+                },
+                stepSize: 50,
+                autoSkip: true,
+                maxTicksLimit: 10
+            }
+        }]
+    },
+      legend: {
+        display: false
+}
+},
+
+
+
+// get line chart canvas
+ini = document.getElementById('ini').getContext('2d')
+
+rs = new RangeSliderChart({
+
+    chartData: iniData,
+    chartOpts: options,
+    chartType: 'line',
+    chartCTX: ini,
+
+    class: 'my-chart-ranger',
+
+    initial: [0,0]
+});
+
+
+function updateLineChart(start, end){
+    rs.options.initial = [start, end];
+    rs.chartOpts.animation = false;
+    rs._draw(ini, rs._getData( rs.options.initial[0], rs.options.initial[1] ), rs.chartOpts, rs.options);
+}
+
+
+
+
+//get polar chart
+var polar = document.getElementById("polar");
+
+var polarData = {
+  labels: [{% for i in range(legends|count) %}"{{ legends[i] }}",{% endfor %}],
+  datasets: [{
+    data: [0,0,0,0,0,0,0,0,0,0],
+    backgroundColor: [{% for i in range(colors|count) %}"{{ colors[i] }}",{% endfor %}]
+  }]
+};
+
+var polarAreaChart = new Chart(polar, {
+  type: 'polarArea',
+  data: polarData,
+  options:{
+      responsive: true,
+      legend:{
+          display: false
+      },
+      scale: {
+          ticks: {
+              callback: function (value){
+                    return value.toFixed(2);
+                },
+              beginAtZero: true,
+              {#stepSize: 1#}
+          }
+      },
+      maintainAspectRatio: false,
+      tooltips:{
+                callbacks: {
+                    label: function(tooltipItems, data) {
+                        return data.labels[tooltipItems.index] +': ' + tooltipItems.yLabel + ' 초';
+                    }
+                }
+      }
+  }
+});
+
+//update polar data
+function updateData(dataset){
+    polarAreaChart.data.datasets.forEach(function(piece, i){
+        polarAreaChart.data.datasets[i].data = dataset;
+        polarAreaChart.update();
+    });
+}
+
+
+
+
+
+function updateBarChart(cur_index){
+    if(cur_index < {{  value_list[0]|count }}) {
+        {% for i in range(legends|count) %}
+            dt = {{ value_list[i] }};
+            var pg_val = dt[cur_index];
+            pg{{ i }}.style.width = Math.floor(pg_val * 100) + "%";
+            pg{{ i }}.innerHTML = (pg_val * 100).toFixed(2) + "%";
+            pg{{ i }}.style.backgroundColor = '{{ colors[i] }}';
+        {% endfor %}
+    };
+}
+
+
+
+////
+var transition = true;
+var updateCall = 0;
+ var update = true;
+
+var frames = document.getElementById('frame');
+var framebox = document.getElementById("framebox");
+var result = document.getElementById("result");
+
+//get image frames after file upload
+var bgImgUrl = 'url("../static/images/image000.jpg")';
+var bgImgPosX = [0];
+var bgImgPosX_toString = "0px";
+
+var num_img = Math.floor((frame.clientWidth)/100);
+
+ {% for i in range(images|count - 1) %}
+     bgImgUrl += ', url("../static/images/{{ images[i+1] }}")';
+     bgImgPosX.push({{ i+1 }}*100);
+     bgImgPosX_toString += "," + String({{ i+1 }}*100 ) + "px ";
+ {% endfor %}
+
+
+
+ function animateFrames(updateCall){
+     var i;
+     var pos;
+     var pos_to= "";
+
+     for (i=0; i <bgImgPosX.length; i++){
+         pos = bgImgPosX[i]- ((updateCall/4 + 1)*100);
+         pos_to += String(pos) + "px";
+         if (i != bgImgPosX.length -1) pos_to += ',';
+     }
+
+    frame.style.backgroundPositionX = pos_to;
+
+    if (transition) frame.style.transition = "background-position .93s linear";
+    else  frame.style.transition = "background-position 0s linear";
+
+    transition = true;
+ }
+
+
+
+
+ function moveFrameBox(updateCall, cur_index){
+     if(cur_index + (num_img*50) +50> {{  value_list[0]|count }}){
+         var left = 33 + frame.clientWidth - (2 * ({{  value_list[0]|count }} - cur_index )) ;  // left padding + frame size - right rows*width per row
+         framebox.style.left = left+"px";
+         framebox.style.width = "1px";
+         if (transition) framebox.style.transition = "left 1.3s linear";
+         else framebox.style.transition = "left 0s linear";
+     }else if (cur_index + (num_img*50) +50<= {{  value_list[0]|count }}){
+         result.removeChild(framebox);
+         result.appendChild(framebox);
+         framebox.style.width = "0";
+         framebox.style.left = "35px";
+         framebox.style.transition = "left 0s";
+         //console.log("trn:",transition);
+         if (transition) framebox.style.animation = "change-boxwidth .93s linear";
+        else framebox.style.animation = "change-boxwidth 0s linear";
+     };
+
+     transition = true;
+ }
+
+
+
+
+
+ //display video and image frames
+function playlocalVID() {
+                            var mplayer = document.getElementById("video-element");
+                             var currentVID = document.getElementById("currentVID");
+                             var selectedLocalVID = document.getElementById("file").files[0];
+                             currentVID.setAttribute("src", URL.createObjectURL(selectedLocalVID));
+                             mplayer.load();
+
+                             mplayer.onloadedmetadata = function() {
+                                  var duration = document.getElementsByClassName("duration");
+                                  duration[0].innerHTML = getTImeFormat(mplayer.duration);
+                             };
+
+
+                         frames.style.backgroundImage = bgImgUrl;
+                         frames.style.backgroundPositionX = bgImgPosX_toString;
+                         updateLineChart(0,num_img*50);
+                         framebox.style.display= 'block';
+                        };
+
+
+
+//video player
+
+{% for i in range(legends|count) %}
+     var pg{{ i }} = document.getElementById("pg{{ i }}");
+{% endfor %}
+
+ // Update the video volume
+ volumeBar.addEventListener("change", function(evt) {
+   player.volume = evt.target.value;
+});
+// Add a listener for the timeupdate event so we can update the progress bar
+player.addEventListener('timeupdate', function(){
+    updateProgressBar();
+}, false);
+// Add a listener for the play and pause events so the buttons state can be updated
+player.addEventListener('play', function() {
+   // Change the button to be a pause button
+   changeButtonType(btnPlayPause, 'pause');
+   update = true;
+}, false);
+
+player.addEventListener('pause', function() {
+   // Change the button to be a play button
+   changeButtonType(btnPlayPause, 'play');
+}, false);
+
+
+player.addEventListener('volumechange', function(e) {
+   // Update the button to be mute/unmute
+   if (player.muted) changeButtonType(btnMute, 'volume-off');
+   else changeButtonType(btnMute, 'volume-up');
+}, false);
+
+player.addEventListener('ended', function() { this.pause(); updateCall = 0; update=false;}, false);
+
+progressBar.addEventListener("click", seek);
+
+ function seek(e) {
+     seeking = true;
+     transition = false;
+     var percent = e.offsetX / this.offsetWidth;
+     //move background image position to the point, animation= false
+     var i;
+     var pos;
+     var pos_to= "";
+
+     for (i=0; i <bgImgPosX.length; i++){
+         pos = bgImgPosX[i]- ((percent)*200);
+         pos_to += String(pos) + "px";
+         if (i != bgImgPosX.length -1) pos_to += ',';
+     }
+
+
+     player.currentTime = percent * player.duration;
+     e.target.value = Math.floor(percent / 100);
+     e.target.innerHTML = progressBar.value + '% played';
+     updateCall = Math.floor(player.currentTime * 4);
+   // console.log(transition);
+ }
+
+ function playPauseVideo() {
+   if (player.paused || player.ended) {
+      // Change the button to a pause button
+      changeButtonType(btnPlayPause, 'pause');
+
+//PauseUpdateFrame
+
+       player.playbackRate = 1;
+      player.play();
+   }
+   else {
+      // Change the button to a play button
+      changeButtonType(btnPlayPause, 'play');
+//StartUpdateFrame from current Percentage
+      player.pause();
+   //   framebox.style.webkitAnimationPlayState = "paused";
+   }
+ }
+
+ var gaugeValue = document.getElementById('gauge-value');
+ // Stop the current media from playing, and return it to the start position
+ function stopVideo() {
+    transition = false;
+   player.pause();
+   //frame.style.backgroundPositionX = bgImgPosX_toString;
+   updateCall = 0;
+   if (player.currentTime) player.currentTime = 0;
+   update = false;
+ }
+
+ // Toggles the media player's mute and unmute status
+ function muteVolume() {
+   if (player.muted) {
+      // Change the button to a mute button
+      changeButtonType(btnMute, 'volume-up');
+      player.muted = false;
+   }
+   else {
+      // Change the button to an unmute button
+      changeButtonType(btnMute, 'volume-off');
+      player.muted = true;
+   }
+ }
+
+ // Replays the media currently loaded in the player
+ function replayVideo() {
+   transition = false;
+   resetPlayer();
+   player.play();
+ }
+
+  // Updates a button's title, innerHTML and CSS class
+ function changeButtonType(btn, value) {
+   btn.title     = value;
+   btn.getElementsByTagName('i')[0].className = "fa fa-"+value;
+   btn.className = value;
+ }
+
+ function resetPlayer() {
+    transition = false ;
+    updateCall = 0;
+   progressBar.value = 0;
+   // Move the media back to the start
+   player.currentTime = 0;
+   // Set the play/pause button to 'play'
+   changeButtonType(btnPlayPause, 'play');
+   cur[0].innerHTML = player.currentTime;
+   cur[1].innerHTML = player.currentTime;
+    gauge.animationSpeed = 1;
+    gauge.set(100);
+ }
+
+
+
+ // Update the progress bar
+ function updateProgressBar() {
+     //.log(player.currentTime);
+   // Work out how much of the media has played via the duration and currentTime parameters
+   cur[0].innerHTML = getTImeFormat(player.currentTime);
+   cur[1].innerHTML = getTImeFormat(player.currentTime);
+   var percentage = Math.floor((100 / player.duration) * player.currentTime);
+   // Update the progress bar's value
+   progressBar.value = percentage;
+   // Update the progress bar's text (for browsers that don't support the progress element)
+   progressBar.innerHTML = percentage + '% played';
+
+    cur_index = Math.floor(updateCall*13);
+
+
+      if ((updateCall % 4 ==0 || seeking) &&  cur_index < {{ value_list[0]|count }}){
+          seeking = false;
+
+        if (cur_index + (num_img*50) +50< {{ value_list[0]|count }}){
+            updateLineChart(cur_index, cur_index+(num_img*50));
+                animateFrames(updateCall);
+            updateData(row_valuelist[cur_index]);
+            moveFrameBox(updateCall, cur_index);
+            updateBarChart(cur_index);
+        };
+
+
+    }else if ( cur_index > {{ value_list[0]|count }}){
+         framebox.style.left = (35+frame.clientWidth)+"px";
+        if (transition) framebox.style.transition = "left "+(player.duration - player.currentTime)+"s linear";
+        else framebox.style.transition = "left 0s linear";
+      }else if(cur_index + (num_img*50) +50 >={{ value_list[0]|count }}){
+          updateData(row_valuelist[cur_index-80]);
+            moveFrameBox(updateCall, cur_index);
+            updateBarChart(cur_index-80);
+      };
+
+     if(updateCall>0 && cur_index <= {{ value_list[0]|count }}) updateGauge(cur_index);
+
+     if (update) updateCall = updateCall +1;
+ }
+
+
+
+
+</script>
+
+
+</body>
+</html>
